@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assistente Diagnostico - Insufflatore</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#17212b;--muted:#66727d;--border:#d9e0e6;--accent:#1769aa;--danger:#b42318;--ok:#137333;--warn:#9a6700}
+*{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+header{background:#17324d;color:white;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:15px}
+header h1{font-size:20px;margin:0} header small{opacity:.8}
+main{max-width:900px;margin:28px auto;padding:0 18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:28px;box-shadow:0 5px 20px #0000000b}
+.progress{height:8px;background:#e7edf2;border-radius:99px;overflow:hidden;margin:12px 0 25px}.bar{height:100%;background:var(--accent);width:0%;transition:.25s}
+.kicker{text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-size:12px;font-weight:700}
+h2{font-size:29px;line-height:1.15;margin:9px 0 10px}
+p{line-height:1.5;color:#45515b}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:25px}
+button{border:0;border-radius:12px;padding:16px 18px;font-size:17px;font-weight:700;cursor:pointer}
+.yes{background:#e8f5ec;color:#137333;border:2px solid #9bd0a9}.no{background:#fff0ef;color:#b42318;border:2px solid #e5aaa5}
+.secondary{background:#eef2f5;color:#34414c;border:1px solid var(--border);font-size:14px;padding:11px 14px}
+footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:10px}
+.step{color:var(--muted);font-size:13px}
+.result{border-radius:14px;padding:20px;margin-top:20px;border:1px solid var(--border);background:#f8fafb}
+.result h3{margin-top:0}.result.danger{background:#fff4f2;border-color:#efb0a8}.result.ok{background:#effaf2;border-color:#a8d7b3}.result.warn{background:#fff9e8;border-color:#ead28a}
+ul{line-height:1.7}.history{margin-top:22px}.history div{padding:8px 0;border-bottom:1px solid #edf0f2;font-size:14px}.history b{font-weight:700}
+.hidden{display:none}
+@media(max-width:650px){.actions{grid-template-columns:1fr}h2{font-size:24px}}
+</style>
+</head>
+<body>
+<header><div><h1>Assistente Diagnostico</h1><small>Procedura guidata per la risoluzione dei problemi dell'insufflatore</small></div>
+<button class="secondary" onclick="restart()">Ricomincia</button></header>
+<main><div class="card">
+<div id="app"></div>
+<div class="progress"><div id="bar" class="bar"></div></div>
+<div id="content"></div>
+<footer><span id="step" class="step"></span><button id="back" class="secondary hidden" onclick="back()">← Indietro</button></footer>
+</div>
+<div id="history" class="history"></div>
+</main>
+<script>
+const nodes = {
+start:{type:"action",title:"Aprire il box domande",next:"power"},
+power:{type:"question",title:"L'insufflatore si accende?",yes:"display",no:"cable"},
+display:{type:"question",title:"Sul display c'è un errore?",yes:"e1",no:"left1"},
+e1:{type:"question",title:"E1: errore fatale?",yes:"assist",no:"e2"},
+e2:{type:"question",title:"E2: errore grave?",yes:"assist",no:"e4"},
+e4:{type:"question",title:"E4: errore minore?",yes:"continue",no:"assist"},
+continue:{type:"result",kind:"warn",title:"Si può continuare per poco",text:"L'errore è classificato come minore. Utilizzare l'apparecchiatura solo per il tempo strettamente necessario e programmare il controllo."},
+assist:{type:"result",kind:"danger",title:"Contattare subito l'assistenza",text:"È stato rilevato un errore che richiede l'intervento dell'assistenza."},
+cable:{type:"question",title:"È inserito correttamente il cavo?",yes:"cableIntact",no:"insertCable"},
+insertCable:{type:"result",kind:"warn",title:"Inserire correttamente il cavo",text:"Controllare il collegamento e inserire correttamente il cavo, poi riprovare."},
+cableIntact:{type:"question",title:"Il cavo è integro?",yes:"switch",no:"replaceCable"},
+replaceCable:{type:"result",kind:"warn",title:"Provare a sostituire il cavo",text:"Il cavo potrebbe essere danneggiato. Sostituirlo con uno idoneo e ripetere la prova."},
+switch:{type:"question",title:"L'interruttore è funzionante?",yes:"voltage",no:"powerCycle"},
+powerCycle:{type:"result",kind:"warn",title:"Spegnere e riaccendere l'interruttore",text:"Eseguire il ciclo di spegnimento/riaccensione dell'interruttore e riprovare."},
+voltage:{type:"question",title:"C'è tensione nella presa?",yes:"fuses",no:"checkVoltage"},
+checkVoltage:{type:"result",kind:"warn",title:"Controllare e, nel caso, dare tensione",text:"Verificare la presenza dell'alimentazione elettrica della presa."},
+fuses:{type:"question",title:"I fusibili sono integri?",yes:"service",no:"replaceFuses"},
+replaceFuses:{type:"result",kind:"warn",title:"Sostituire i fusibili",text:"Sostituire i fusibili secondo le specifiche previste e riprovare."},
+left1:{type:"question",title:"Controllato il filtro?",yes:"left2",no:"filter1"},
+filter1:{type:"result",kind:"warn",title:"Controllare che non sia tappato o da sostituire",text:"Verificare il filtro e sostituirlo se ostruito o non più utilizzabile."},
+left2:{type:"question",title:"Controllato il filtro posteriore?",yes:"left3",no:"filter2"},
+filter2:{type:"result",kind:"warn",title:"Controllare integrità e verso filtro",text:"Verificare che il filtro sia integro e montato nel verso corretto."},
+left3:{type:"question",title:"Controllato tubo CO₂?",yes:"left4",no:"filter3"},
+filter3:{type:"result",kind:"warn",title:"Controllare che non sia ostruito; in caso sostituire",text:"Verificare il tubo CO₂ e sostituirlo se necessario."},
+left4:{type:"question",title:"Controllato bombola CO₂ centralizzata?",yes:"service",no:"filter4"},
+filter4:{type:"result",kind:"warn",title:"Verificare modalità corretta",text:"Verificare che la bombola CO₂ centralizzata sia utilizzata nella modalità prevista."},
+service:{type:"result",kind:"danger",title:"Contattare il Customer Service",text:"I controlli previsti dal percorso non hanno risolto il problema. Contattare il Customer Service."},
+ok:{type:"result",kind:"ok",title:"Problema risolto",text:"L'insufflatore funziona correttamente. Grazie per l'attenzione."}
+};
+let current="start", stack=[], history=[];
+function render(){
+ const n=nodes[current]; const c=document.getElementById("content");
+ document.getElementById("back").classList.toggle("hidden",stack.length===0);
+ const total=Math.max(1,stack.length+1); document.getElementById("bar").style.width=Math.min(96,total*7)+"%";
+ document.getElementById("step").textContent = n.type==="result" ? "Esito della diagnosi" : "Rispondi alla domanda";
+ if(n.type==="action"){
+  c.innerHTML=`<div class="kicker">Avvio procedura</div><h2>${n.title}</h2><p>Segui la procedura guidata. Le risposte determineranno automaticamente il prossimo controllo.</p><div class="actions"><button class="yes" onclick="go('${n.next}','Continua')">Continua →</button></div>`;
+ } else if(n.type==="question"){
+  c.innerHTML=`<div class="kicker">Controllo</div><h2>${n.title}</h2><p>Seleziona una delle due risposte per proseguire nella diagnosi.</p><div class="actions"><button class="yes" onclick="go('${n.yes}','Sì')">✓ Sì</button><button class="no" onclick="go('${n.no}','No')">✕ No</button></div>`;
+ } else {
+  c.innerHTML=`<div class="result ${n.kind}"><div class="kicker">Esito</div><h2>${n.title}</h2><p>${n.text}</p>${n.kind==="danger"?"<p><b>Se necessario, interrompere l'utilizzo dell'apparecchiatura.</b></p>":""}</div><div class="actions"><button class="yes" onclick="restart()">↻ Nuova diagnosi</button></div>`;
+ }
+}
+function go(id,answer){stack.push({id:current,answer});history.push({q:nodes[current].title,a:answer});current=id;render();renderHistory()}
+function back(){if(!stack.length)return;const last=stack.pop();history.pop();current=last.id;render();renderHistory()}
+function restart(){current="start";stack=[];history=[];render();renderHistory()}
+function renderHistory(){document.getElementById("history").innerHTML=history.length?`<div><b>Storico della diagnosi</b></div>`+history.slice(-8).map(x=>`<div>${x.q} → <b>${x.a}</b></div>`).join(""):"";}
+render();renderHistory();
+</script>
+</body></html>
